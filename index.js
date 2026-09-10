@@ -11,7 +11,7 @@ const provider = new ethers.JsonRpcProvider(RPC_URL);
 
 // Aapke 50-100 Wallets ki list (Lowercase mein rakhna zaroori hai)
 const targetWallets = [
-    "0x00179a311d6b239f2d367372b0dd7799946e6ab6"
+    "0x00179a311d6b239f2d367372b0dd7799946e6ab6",
 "0xcd800c0869b4cfe1ac243923dc8caf56fa112d44",
 "0xb85d7931ab76e10a5745bc43b5dc89173d88dd85",
 "0xa9962d8614d6fefd1160a775e01d72e9c8efc807",
