@@ -1,0 +1,14 @@
+{
+  "name": "wallet-tracker-bot",
+  "version": "1.0.0",
+  "description": "Telegram Wallet Tracker",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.8.0"
+  }
+}
