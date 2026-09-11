@@ -137,7 +137,6 @@ async function sendTelegramMessage(text) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 chat_id: CHAT_ID,
-                message_thread_id: NFT_THREAD_ID,
                 text: text,
                 parse_mode: "HTML"
             })
