@@ -1,4 +1,5 @@
 const { ethers } = require("ethers");
+const http = require('http'); // Render ke liye
 
 // 1. Environment Variables
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -9,9 +10,9 @@ const NFT_THREAD_ID = process.env.NFT_THREAD_ID;
 // 2. Provider Setup (Chain ID 4663 fixed)
 const provider = new ethers.JsonRpcProvider(RPC_URL, 4663);
 
-// 3. Aapke 11 Wallets (Yahan apne wallets daal lijiye)
+// 3. Aapke Wallets (Yahan apne 11 wallets daal lijiye)
 const targetWallets = [
-     "0x2ef1b2567aa33e1ba07f4fbd1a297223df28bafa",
+    "0x2ef1b2567aa33e1ba07f4fbd1a297223df28bafa",
 "0xe908ba570259e4bb1e1fdd2edd9b15e092b13211",
 "0xcd211569a108fdac74d729ba7358a743a3c2e08d",
 "0xcdea19e6d247619ed5fefe47b4992ea577ad2142",
@@ -27,7 +28,7 @@ const targetWallets = [
 "0x7082ee6bb34a072a2fb0f46180d10bcc9a9c07d3"
 ].map(address => address.toLowerCase()); // Aakhri wale ke baad comma nahi aayega
 
-// NFT Transfer Topic (Screenshot ke hisaab se)
+// NFT Transfer Topic 
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
 // Telegram Alert Function
@@ -49,7 +50,7 @@ async function sendTelegramMessage(text) {
     }
 }
 
-// 4. 1-Minute Polling System (Speed Breaker)
+// 4. 1-Minute Polling System with 10-Block Chunking
 let lastCheckedBlock = 0;
 
 async function checkNFTs() {
@@ -65,25 +66,40 @@ async function checkNFTs() {
         if (latestBlock > lastCheckedBlock) {
             console.log(`Checking blocks from ${lastCheckedBlock} to ${latestBlock}...`);
             
-            // Ek sath saare blocks ka data 1 hi request mein nikalega
-            const logs = await provider.getLogs({
-                fromBlock: lastCheckedBlock,
-                toBlock: latestBlock,
-                topics: [TRANSFER_TOPIC]
-            });
+            // Blocks ko 10-10 ke chunks mein divide kar rahe hain
+            let currentFrom = lastCheckedBlock;
 
-            for (let log of logs) {
-                if (log.topics.length >= 3) {
-                    const fromAddress = ethers.dataSlice(log.topics[1], 12).toLowerCase();
-                    const toAddress = ethers.dataSlice(log.topics[2], 12).toLowerCase();
+            while (currentFrom <= latestBlock) {
+                let currentTo = currentFrom + 9; // Max 10 blocks allowed on free tier
+                if (currentTo > latestBlock) {
+                    currentTo = latestBlock;
+                }
 
-                    if (targetWallets.includes(fromAddress) || targetWallets.includes(toAddress)) {
-                        console.log("Match Found! Telegram par bhej raha hu...");
-                        const msg = `🚨 <b>NFT Transfer Detected!</b>\n\n<b>From:</b> <code>${fromAddress}</code>\n<b>To:</b> <code>${toAddress}</code>\n<b>Tx:</b> <code>${log.transactionHash}</code>`;
-                        await sendTelegramMessage(msg);
+                const logs = await provider.getLogs({
+                    fromBlock: currentFrom,
+                    toBlock: currentTo,
+                    topics: [TRANSFER_TOPIC]
+                });
+
+                for (let log of logs) {
+                    if (log.topics.length >= 3) {
+                        const fromAddress = ethers.dataSlice(log.topics[1], 12).toLowerCase();
+                        const toAddress = ethers.dataSlice(log.topics[2], 12).toLowerCase();
+
+                        if (targetWallets.includes(fromAddress) || targetWallets.includes(toAddress)) {
+                            console.log("Match Found! Telegram par bhej raha hu...");
+                            const msg = `🚨 <b>NFT Transfer Detected!</b>\n\n<b>From:</b> <code>${fromAddress}</code>\n<b>To:</b> <code>${toAddress}</code>\n<b>Tx:</b> <code>${log.transactionHash}</code>`;
+                            await sendTelegramMessage(msg);
+                        }
                     }
                 }
+
+                currentFrom = currentTo + 1;
+                
+                // Alchemy ko spam na lage, isliye har chunk ke baad thoda aaram
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
+            
             lastCheckedBlock = latestBlock; 
         }
     } catch (error) {
@@ -91,16 +107,14 @@ async function checkNFTs() {
     }
 }
 
-// Yahan set kiya hai 60000 milliseconds (1 Minute) ka timer
+// Har 60000 milliseconds (1 Minute) mein check karega
 setInterval(checkNFTs, 60000);
 
 // Bot shuru hone par pehli check
 checkNFTs();
 
-// Render ko khush rakhne ke liye ek nakli Web Server
-const http = require('http');
+// 5. Render ko khush rakhne ke liye ek nakli Web Server
 const port = process.env.PORT || 3000;
-
 http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.write('NFT Bot is perfectly running!');
