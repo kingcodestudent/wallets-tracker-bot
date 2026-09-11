@@ -128,11 +128,11 @@ const targetWallets = [
 // NFT Transfer Topic 
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
-// Telegram Alert Function
+// Telegram Alert Function (With Detailed Error Logging)
 async function sendTelegramMessage(text) {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
     try {
-        await fetch(url, {
+        const response = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -142,8 +142,16 @@ async function sendTelegramMessage(text) {
                 parse_mode: "HTML"
             })
         });
+        
+        const data = await response.json();
+        
+        if (!data.ok) {
+            console.error("❌ TELEGRAM ERROR:", data.description);
+        } else {
+            console.log("✅ Telegram par message successfully chala gaya!");
+        }
     } catch (error) {
-        console.error("Telegram error:", error);
+        console.error("Telegram network error:", error);
     }
 }
 
