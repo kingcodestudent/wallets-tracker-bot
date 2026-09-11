@@ -226,4 +226,5 @@ http.createServer((req, res) => {
     res.end();
 }).listen(port, () => {
     console.log(`Dummy server started on port ${port}`);
+    sendTelegramMessage("✅ <b>Boss, NFT Tracker Bot successfully chalu ho gaya hai!</b>");
 });
