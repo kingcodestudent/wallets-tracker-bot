@@ -8,7 +8,7 @@ const RPC_URL = process.env.RPC_URL;
 const NFT_THREAD_ID = process.env.NFT_THREAD_ID;
 
 const provider = new ethers.JsonRpcProvider(RPC_URL);
-provider.pollingInterval = 12000;
+provider.pollingInterval = 20000;
 
 // Aapke 50-100 Wallets ki list (Lowercase mein rakhna zaroori hai)
 const targetWallets = [
