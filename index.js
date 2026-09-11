@@ -1,18 +1,17 @@
-require('dotenv').config();
-const { ethers } = require('ethers');
-const axios = require('axios');
+const { ethers } = require("ethers");
 
+// 1. Environment Variables
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const CHAT_ID = process.env.CHAT_ID;
 const RPC_URL = process.env.RPC_URL;
 const NFT_THREAD_ID = process.env.NFT_THREAD_ID;
 
+// 2. Provider Setup (Chain ID 4663 fixed)
 const provider = new ethers.JsonRpcProvider(RPC_URL, 4663);
-provider.pollingInterval = 20000;
 
-// Aapke 50-100 Wallets ki list (Lowercase mein rakhna zaroori hai)
+// 3. Aapke 11 Wallets (Yahan apne wallets daal lijiye)
 const targetWallets = [
-    "0x2ef1b2567aa33e1ba07f4fbd1a297223df28bafa",
+     "0x2ef1b2567aa33e1ba07f4fbd1a297223df28bafa",
 "0xe908ba570259e4bb1e1fdd2edd9b15e092b13211",
 "0xcd211569a108fdac74d729ba7358a743a3c2e08d",
 "0xcdea19e6d247619ed5fefe47b4992ea577ad2142",
@@ -26,62 +25,74 @@ const targetWallets = [
 "0x10dc0417835bace30dd4afb05aa7590532a874e6",
 "0xbffa316d6430bce0ba92c9996e488319a06d7f6f",
 "0x7082ee6bb34a072a2fb0f46180d10bcc9a9c07d3"
-].map(address => address.toLowerCase());
+].map(address => address.toLowerCase()); // Aakhri wale ke baad comma nahi aayega
 
-// ERC-721 (NFT) ka standard Transfer Event signature
-const transferEventSignature = ethers.id("Transfer(address,address,uint256)");
+// NFT Transfer Topic (Screenshot ke hisaab se)
+const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
+// Telegram Alert Function
 async function sendTelegramMessage(text) {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
     try {
-        await axios.post(url, {
-            chat_id: CHAT_ID,
-            message_thread_id: NFT_THREAD_ID,
-            text: text,
-            parse_mode: "HTML"
+        await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                chat_id: CHAT_ID,
+                message_thread_id: NFT_THREAD_ID,
+                text: text,
+                parse_mode: "HTML"
+            })
         });
     } catch (error) {
-        console.log("Telegram Error:", error.message);
+        console.error("Telegram error:", error);
     }
 }
 
-console.log("🎨 NFT Tracker Shuru Ho Gaya Hai...");
+// 4. 1-Minute Polling System (Speed Breaker)
+let lastCheckedBlock = 0;
 
-// Har naye block par sirf 'Logs' (Smart Contract Events) check karna
-provider.on("block", async (blockNumber) => {
+async function checkNFTs() {
     try {
-        // Hum provider se bol rahe hain ki is block mein sirf NFT Transfers dhoondo
-        const logs = await provider.getLogs({
-            fromBlock: blockNumber,
-            toBlock: blockNumber,
-            topics: [transferEventSignature]
-        });
+        const latestBlock = await provider.getBlockNumber();
+        
+        if (lastCheckedBlock === 0) {
+            lastCheckedBlock = latestBlock; 
+            console.log("🎨 NFT Tracker Shuru Ho Gaya Hai... (Har 1 Minute me check karega)");
+            return; 
+        }
 
-        for (let log of logs) {
-            // Topics se Sender aur Receiver nikalna (Address 24 characters extra padding ke sath aate hain)
-            const from = ethers.dataSlice(log.topics[1], 12).toLowerCase();
-            const to = ethers.dataSlice(log.topics[2], 12).toLowerCase();
-            const tokenId = ethers.toBigInt(log.topics[3] || log.data).toString();
+        if (latestBlock > lastCheckedBlock) {
+            console.log(`Checking blocks from ${lastCheckedBlock} to ${latestBlock}...`);
+            
+            // Ek sath saare blocks ka data 1 hi request mein nikalega
+            const logs = await provider.getLogs({
+                fromBlock: lastCheckedBlock,
+                toBlock: latestBlock,
+                topics: [TRANSFER_TOPIC]
+            });
 
-            // Agar bhejne wala ya receive karne wala humari list mein hai
-            if (targetWallets.includes(from) || targetWallets.includes(to)) {
-                
-                // Pata lagana ki humare wallet ne kharida hai ya becha
-                const action = targetWallets.includes(to) ? "🟩 BOUGHT / RECEIVED" : "🟥 SOLD / SENT";
-                const ourWallet = targetWallets.includes(to) ? to : from;
+            for (let log of logs) {
+                if (log.topics.length >= 3) {
+                    const fromAddress = ethers.dataSlice(log.topics[1], 12).toLowerCase();
+                    const toAddress = ethers.dataSlice(log.topics[2], 12).toLowerCase();
 
-                let msg = `🎨 <b>NFT Activity Detected!</b>\n\n` +
-                          `<b>Action:</b> ${action}\n` +
-                          `<b>Wallet:</b> <code>${ourWallet}</code>\n` +
-                          `<b>NFT Token ID:</b> ${tokenId}\n` +
-                          `<b>Contract:</b> <code>${log.address}</code>\n` +
-                          `<b>Tx Hash:</b> ${log.transactionHash}`;
-                
-                sendTelegramMessage(msg);
-                console.log(`NFT Transaction mili! Token ID: ${tokenId}`);
+                    if (targetWallets.includes(fromAddress) || targetWallets.includes(toAddress)) {
+                        console.log("Match Found! Telegram par bhej raha hu...");
+                        const msg = `🚨 <b>NFT Transfer Detected!</b>\n\n<b>From:</b> <code>${fromAddress}</code>\n<b>To:</b> <code>${toAddress}</code>\n<b>Tx:</b> <code>${log.transactionHash}</code>`;
+                        await sendTelegramMessage(msg);
+                    }
+                }
             }
+            lastCheckedBlock = latestBlock; 
         }
     } catch (error) {
-        console.log("Block check karne mein error:", error.message);
+        console.error("Block check karne mein error (Ignore if it happens rarely):", error.message);
     }
-});
+}
+
+// Yahan set kiya hai 60000 milliseconds (1 Minute) ka timer
+setInterval(checkNFTs, 60000);
+
+// Bot shuru hone par pehli check
+checkNFTs();
