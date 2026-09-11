@@ -96,3 +96,15 @@ setInterval(checkNFTs, 60000);
 
 // Bot shuru hone par pehli check
 checkNFTs();
+
+// Render ko khush rakhne ke liye ek nakli Web Server
+const http = require('http');
+const port = process.env.PORT || 3000;
+
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.write('NFT Bot is perfectly running!');
+    res.end();
+}).listen(port, () => {
+    console.log(`Dummy server started on port ${port}`);
+});
