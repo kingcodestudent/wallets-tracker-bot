@@ -192,14 +192,28 @@ async function checkNFTs() {
                     topics: [TRANSFER_TOPIC]
                 });
 
+                // NAYA LOOP: Sirf Asli NFTs (4 topics) ko pakdega aur Swaps (3 topics) ko ignore karega
                 for (let log of logs) {
-                    if (log.topics.length >= 3) {
+                    if (log.topics.length === 4) { 
                         const fromAddress = ethers.dataSlice(log.topics[1], 12).toLowerCase();
                         const toAddress = ethers.dataSlice(log.topics[2], 12).toLowerCase();
+                        
+                        // NFT Collection ka Address
+                        const contractAddress = log.address.toLowerCase();
+                        
+                        // Hexadecimal Token ID ko normal number mein badalna
+                        const tokenId = BigInt(log.topics[3]).toString();
 
                         if (targetWallets.includes(fromAddress) || targetWallets.includes(toAddress)) {
-                            console.log("✅ Match Found! Telegram par bhej raha hu...");
-                            const msg = `🚨 <b>NFT Transfer Detected!</b>\n\n<b>From:</b> <code>${fromAddress}</code>\n<b>To:</b> <code>${toAddress}</code>\n<b>Tx:</b> <code>${log.transactionHash}</code>`;
+                            console.log(`🎨 Asli NFT Found (Token ID: ${tokenId})! Telegram par bhej raha hu...`);
+                            
+                            const msg = `🚨 <b>NFT Transfer Detected!</b>\n\n` + 
+                                        `<b>Collection:</b> <code>${contractAddress}</code>\n` +
+                                        `<b>Token ID:</b> #${tokenId}\n\n` +
+                                        `<b>From:</b> <code>${fromAddress}</code>\n` +
+                                        `<b>To:</b> <code>${toAddress}</code>\n\n` +
+                                        `<b>Tx:</b> <code>${log.transactionHash}</code>`;
+                                        
                             await sendTelegramMessage(msg);
                         }
                     }
