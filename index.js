@@ -192,23 +192,33 @@ async function checkNFTs() {
                     topics: [TRANSFER_TOPIC]
                 });
 
-                // NAYA LOOP: Sirf Asli NFTs (4 topics) ko pakdega aur Swaps (3 topics) ko ignore karega
+                // NAYA LOOP: NFTs ka Naam + Minting Check
                 for (let log of logs) {
                     if (log.topics.length === 4) { 
                         const fromAddress = ethers.dataSlice(log.topics[1], 12).toLowerCase();
                         const toAddress = ethers.dataSlice(log.topics[2], 12).toLowerCase();
-                        
-                        // NFT Collection ka Address
                         const contractAddress = log.address.toLowerCase();
-                        
-                        // Hexadecimal Token ID ko normal number mein badalna
                         const tokenId = BigInt(log.topics[3]).toString();
 
                         if (targetWallets.includes(fromAddress) || targetWallets.includes(toAddress)) {
-                            console.log(`🎨 Asli NFT Found (Token ID: ${tokenId})! Telegram par bhej raha hu...`);
                             
-                            const msg = `🚨 <b>NFT Transfer Detected!</b>\n\n` + 
-                                        `<b>Collection:</b> <code>${contractAddress}</code>\n` +
+                            // 1. Smart Contract se NFT Collection ka naam nikalna
+                            let collectionName = "Unknown Collection";
+                            try {
+                                const contract = new ethers.Contract(contractAddress, ["function name() view returns (string)"], provider);
+                                collectionName = await contract.name();
+                            } catch (error) {
+                                console.log("Naam fetch nahi ho paya (Non-standard contract)");
+                            }
+
+                            // 2. Minting Check (Agar Zero Address se aayi hai, toh Mint hui hai)
+                            const isMint = fromAddress === "0x0000000000000000000000000000000000000000";
+                            const alertTitle = isMint ? "✨ <b>NEW NFT MINTED!</b>" : "🚨 <b>NFT Transfer Detected!</b>";
+
+                            console.log(`🎨 ${collectionName} Found! Telegram par bhej raha hu...`);
+                            
+                            const msg = `${alertTitle}\n\n` + 
+                                        `<b>Name:</b> ${collectionName}\n` +
                                         `<b>Token ID:</b> #${tokenId}\n\n` +
                                         `<b>From:</b> <code>${fromAddress}</code>\n` +
                                         `<b>To:</b> <code>${toAddress}</code>\n\n` +
